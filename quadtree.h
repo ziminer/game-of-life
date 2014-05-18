@@ -1,12 +1,8 @@
 #ifndef __QUADTREE_H__
 #define __QUADTREE_H__
 
-#include <utility>
 #include <vector>
-#include <set>
-
-// TODO: (performance) Store posns in an unordered_set instead of set
-typedef std::pair<unsigned long, unsigned long> Posn;
+#include "cell.h"
 
 /**
  * Rectangle for collision detection
@@ -61,7 +57,7 @@ public:
 
 class QuadTree {
 private:
-  std::vector<Posn> _points;
+  std::vector<Cell> _cells;
 
   BoundingBox _boundary;
 
@@ -84,10 +80,10 @@ public:
 
   void Clear();
 
-  bool Insert(const Posn& point);
+  bool Insert(const Cell& point);
 
   void FindPoints(const BoundingBox& bound,
-                  std::set<Posn>& out) const;
+                  CellSet& out) const;
 
   // Debugging method
   void Print();

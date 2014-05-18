@@ -71,11 +71,11 @@ void testBoundingBox() {
 void testQuadTree() {
   QuadTree tree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX));
   cout << "Testing quad tree..." << endl;
-  tree.Insert(Posn(1,1));
-  tree.Insert(Posn(2,2));
-  tree.Insert(Posn(1,0));
-  tree.Insert(Posn(1,2));
-  set<Posn> results;
+  tree.Insert(Cell(1,1));
+  tree.Insert(Cell(2,2));
+  tree.Insert(Cell(1,0));
+  tree.Insert(Cell(1,2));
+  CellSet results;
   tree.FindPoints(BoundingBox(0, 0, 10, 10), results);
   assert(results.size() == 4);
   results.clear();

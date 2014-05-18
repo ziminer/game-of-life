@@ -36,7 +36,7 @@ QuadTree::~QuadTree() {
 }
 
 void QuadTree::Clear() {
-  _points.clear();
+  _cells.clear();
   if (_upperLeft != NULL) {
     delete _upperLeft;
     _upperLeft = NULL;
@@ -61,7 +61,7 @@ void QuadTree::Divide() {
     return;
   }
 
-  assert(!_points.empty());
+  assert(!_cells.empty());
 
   unsigned long leftWidth = _boundary._width / 2;
   unsigned long rightWidth = leftWidth + _boundary._width % 2;
@@ -78,42 +78,42 @@ void QuadTree::Divide() {
                                         _boundary._y + topHeight,
                                         rightWidth, bottomHeight));
 
-  Posn point = *_points.begin();
-  _points.pop_back();
-  Insert(point);
-  assert(_points.empty());
+  Cell cell = *_cells.begin();
+  _cells.pop_back();
+  Insert(cell);
+  assert(_cells.empty());
 }
 
 void QuadTree::Print() {
   if (_upperLeft != NULL) {
-    assert(_points.empty());
+    assert(_cells.empty());
     _upperLeft->Print();
     _upperRight->Print();
     _lowerLeft->Print();
     _lowerRight->Print();
   } else {
-    for (vector<Posn>::const_iterator it = _points.begin();
-         it != _points.end(); ++it) {
-      cout << "x: " << it->first << " y: " << it->second << endl;
+    for (vector<Cell>::const_iterator it = _cells.begin();
+         it != _cells.end(); ++it) {
+      cout << "x: " << it->x << " y: " << it->y << endl;
     }
   }
 }
 
-bool QuadTree::Insert(const Posn& point) {
-  if (_boundary.Contains(point.first, point.second)) {
-    if (_points.empty() && _upperLeft == NULL) {
-      _points.push_back(point);
+bool QuadTree::Insert(const Cell& cell) {
+  if (_boundary.Contains(cell.x, cell.y)) {
+    if (_cells.empty() && _upperLeft == NULL) {
+      _cells.push_back(cell);
       return true;
     } else {
       Divide();
-      assert(_points.empty());
-      if (_upperLeft->Insert(point)) {
+      assert(_cells.empty());
+      if (_upperLeft->Insert(cell)) {
         return true;
-      } else if (_upperRight->Insert(point)) {
+      } else if (_upperRight->Insert(cell)) {
         return true;
-      } else if (_lowerLeft->Insert(point)) {
+      } else if (_lowerLeft->Insert(cell)) {
         return true;
-      } else if (_lowerRight->Insert(point)) {
+      } else if (_lowerRight->Insert(cell)) {
         return true;
       } else {
         return false;
@@ -125,19 +125,19 @@ bool QuadTree::Insert(const Posn& point) {
 }
 
 void QuadTree::FindPoints(const BoundingBox& bound,
-                          set<Posn>& out) const {
+                          CellSet& out) const {
   if (_boundary.Intersects(bound)) {
     if (_upperLeft == NULL) {
       // This is a leaf node. Check it!
-      for (vector<Posn>::const_iterator it = _points.begin();
-           it != _points.end(); ++it) {
-        if (bound.ContainsGreedy(it->first, it->second)) {
+      for (vector<Cell>::const_iterator it = _cells.begin();
+           it != _cells.end(); ++it) {
+        if (bound.ContainsGreedy(it->x, it->y)) {
           out.insert(*it);
         }
       }
     } else {
       // This is a parent node.
-      assert(_points.empty());
+      assert(_cells.empty());
       _upperLeft->FindPoints(bound, out);
       _upperRight->FindPoints(bound, out);
       _lowerLeft->FindPoints(bound, out);

@@ -14,7 +14,7 @@ GameBoard::GameBoard(const CellSet& points)
   for (CellSet::const_iterator it = points.begin();
        it != points.end(); ++it) {
     cout << "Initial point " << it->x << " " << it->y << endl;
-    _quadTree.Insert(Posn(it->x, it->y));
+    _quadTree.Insert(*it);
   } 
   _quadTree.Print();
 }
@@ -27,7 +27,7 @@ void GameBoard::MarkAlive(const CellSet& cells) {
   for (CellSet::iterator it = cells.begin();
        it != cells.end(); ++it) {
     assert(it->isAlive);
-    _quadTree.Insert(Posn(it->x, it->y));
+    _quadTree.Insert(*it);
   } 
 }
 
@@ -49,7 +49,7 @@ int GameBoard::NumNeighbours(const Cell& cell) {
     searchBox._height = 2;
   }
 
-  set<Posn> neighbours;
+  CellSet neighbours;
   _quadTree.FindPoints(searchBox, neighbours);
   // The original cell is in the search box, so should
   // be at least one. If a dead cell, we only look at
