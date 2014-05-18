@@ -67,7 +67,7 @@ void testBoundingBox() {
 }
 
 void testQuadTree() {
-  QuadTree tree(BoundingBox(0, 0, LONG_MAX, LONG_MAX));
+  QuadTree tree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX));
   cout << "Testing quad tree..." << endl;
   tree.Insert(pair<unsigned long, unsigned long>(1,1));
   tree.Insert(pair<unsigned long, unsigned long>(2,2));

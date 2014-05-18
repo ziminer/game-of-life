@@ -151,9 +151,5 @@ void QuadTree::QueryRange(const BoundingBox& bound,
       _lowerLeft->QueryRange(bound, out);
       _lowerRight->QueryRange(bound, out);
     }
-  } else {
-    cout << "Boxes dont intersect" << endl;
-    _boundary.Print();
-    bound.Print();
   }
 }
