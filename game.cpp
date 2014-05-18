@@ -26,6 +26,7 @@ void GameBoard::MarkAlive(const CellSet& cells) {
   _quadTree.Clear();
   for (CellSet::iterator it = cells.begin();
        it != cells.end(); ++it) {
+    assert(it->isAlive);
     _quadTree.Insert(Posn(it->x, it->y));
   } 
 }
