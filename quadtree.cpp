@@ -8,12 +8,6 @@ void BoundingBox::Print() const {
   cout << "x: " << _x << " y: " << _y << " width: " << _width << " height: " << _height << endl;
 }
 
-bool BoundingBox::ContainsInside(unsigned long x,
-                                 unsigned long y) const {
-  return x > _x && x < (_x + _width) &&
-         y > _y && y < (_y + _height);
-}
-
 bool BoundingBox::Contains(unsigned long x,
                            unsigned long y) const {
   return x > _x && x <= (_x + _width) &&
@@ -27,17 +21,6 @@ bool BoundingBox::ContainsGreedy(unsigned long x,
 }
 
 bool BoundingBox::Intersects(const BoundingBox& box) const {
-  return Contains(box._x, box._y) ||
-         Contains(box._x, box._y + box._height) ||
-         Contains(box._x + box._width, box._y) ||
-         Contains(box._x + box._width, box._y + box._height) ||
-         box.ContainsInside(_x, _y) ||
-         box.ContainsInside(_x, _y + _height) ||
-         box.ContainsInside(_x + _width, _y) ||
-         box.ContainsInside(_x + _width, _y + _height);
-}
-
-bool BoundingBox::IntersectsGreedy(const BoundingBox& box) const {
   return ContainsGreedy(box._x, box._y) ||
          ContainsGreedy(box._x, box._y + box._height) ||
          ContainsGreedy(box._x + box._width, box._y) ||
@@ -49,17 +32,26 @@ bool BoundingBox::IntersectsGreedy(const BoundingBox& box) const {
 }
 
 QuadTree::~QuadTree() {
+  Clear();
+}
+
+void QuadTree::Clear() {
+  _points.clear();
   if (_upperLeft != NULL) {
     delete _upperLeft;
+    _upperLeft = NULL;
   }
   if (_upperRight != NULL) {
     delete _upperRight;
+    _upperRight = NULL;
   }
   if (_lowerLeft != NULL) {
     delete _lowerLeft;
+    _lowerLeft = NULL;
   }
   if (_lowerRight != NULL) {
     delete _lowerRight;
+    _lowerRight = NULL;
   }
 }
 
@@ -86,7 +78,7 @@ void QuadTree::Divide() {
                                         _boundary._y + topHeight,
                                         rightWidth, bottomHeight));
 
-  pair<unsigned long, unsigned long> point = *_points.begin();
+  Posn point = *_points.begin();
   _points.pop_back();
   Insert(point);
   assert(_points.empty());
@@ -100,14 +92,14 @@ void QuadTree::Print() {
     _lowerLeft->Print();
     _lowerRight->Print();
   } else {
-    for (vector< pair<unsigned long, unsigned long> >::const_iterator it = _points.begin();
+    for (vector<Posn>::const_iterator it = _points.begin();
          it != _points.end(); ++it) {
       cout << "x: " << it->first << " y: " << it->second << endl;
     }
   }
 }
 
-bool QuadTree::Insert(const pair<unsigned long, unsigned long>& point) {
+bool QuadTree::Insert(const Posn& point) {
   if (_boundary.Contains(point.first, point.second)) {
     if (_points.empty() && _upperLeft == NULL) {
       _points.push_back(point);
@@ -132,12 +124,12 @@ bool QuadTree::Insert(const pair<unsigned long, unsigned long>& point) {
   }
 }
 
-void QuadTree::QueryRange(const BoundingBox& bound,
-                          set< pair<unsigned long, unsigned long> >& out) const {
-  if (_boundary.IntersectsGreedy(bound)) {
+void QuadTree::FindPoints(const BoundingBox& bound,
+                          set<Posn>& out) const {
+  if (_boundary.Intersects(bound)) {
     if (_upperLeft == NULL) {
       // This is a leaf node. Check it!
-      for (vector< pair<unsigned long, unsigned long> >::const_iterator it = _points.begin();
+      for (vector<Posn>::const_iterator it = _points.begin();
            it != _points.end(); ++it) {
         if (bound.ContainsGreedy(it->first, it->second)) {
           out.insert(*it);
@@ -146,10 +138,10 @@ void QuadTree::QueryRange(const BoundingBox& bound,
     } else {
       // This is a parent node.
       assert(_points.empty());
-      _upperLeft->QueryRange(bound, out);
-      _upperRight->QueryRange(bound, out);
-      _lowerLeft->QueryRange(bound, out);
-      _lowerRight->QueryRange(bound, out);
+      _upperLeft->FindPoints(bound, out);
+      _upperRight->FindPoints(bound, out);
+      _lowerLeft->FindPoints(bound, out);
+      _lowerRight->FindPoints(bound, out);
     }
   }
 }

@@ -1,55 +1,118 @@
 #include "game.h"
 #include <queue>
+#include <cassert>
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include "cellQueue.h"
 
 using namespace std;
 
-GameBoard::GameBoard(const set<Cell>& points) : _liveCells(points) {
+GameBoard::GameBoard(const CellSet& points)
+  : _liveCells(points), _quadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX))
+{
+  for (CellSet::const_iterator it = points.begin();
+       it != points.end(); ++it) {
+    cout << "Initial point " << it->x << " " << it->y << endl;
+    _quadTree.Insert(Posn(it->x, it->y));
+  } 
+  _quadTree.Print();
 }
 
 void GameBoard::KillAll() {
 }
 
-void GameBoard::MarkAlive(const set<Cell>& cells) {
+void GameBoard::MarkAlive(const CellSet& cells) {
+  _quadTree.Clear();
+  for (CellSet::iterator it = cells.begin();
+       it != cells.end(); ++it) {
+    _quadTree.Insert(Posn(it->x, it->y));
+  } 
 }
 
 int GameBoard::NumNeighbours(const Cell& cell) {
+  BoundingBox searchBox;
+  if (cell.x == 0) {
+    searchBox._x = 0;
+    searchBox._width = 1;
+  } else {
+    searchBox._x = cell.x - 1;
+    searchBox._width = 2;
+  }
+
+  if (cell.y == 0) {
+    searchBox._y = 0;
+    searchBox._height = 1;
+  } else {
+    searchBox._y = cell.y - 1;
+    searchBox._height = 2;
+  }
+
+  set<Posn> neighbours;
+  _quadTree.FindPoints(searchBox, neighbours);
+  // The original cell is in the search box, so should
+  // be at least one. If a dead cell, we only look at
+  // dead cells next to alive ones so there should be at least one.
+  assert(neighbours.size() > 0);
+  return cell.isAlive ? neighbours.size() - 1 : neighbours.size();
 }
 
 void GameBoard::Draw() {
 }
 
 void GameBoard::Update() {
-  queue<Cell> processQueue;
-  set<Cell> nextLiveCells;
-
-  for (set<Cell>::const_iterator it = _liveCells.begin();
-       it != _liveCells.end(); ++it) {
-    processQueue.push(*it);
+  if (!_liveCells.empty()) {
+    cout << "--------" << endl;
+    for (CellSet::iterator it = _liveCells.begin(); it != _liveCells.end(); ++it) {
+      cout << "Alive cell x: " << it->x << " y: " << it->y << endl;
+    }
   }
+  CellSet nextLiveCells;
+  CellQueue processQueue(_liveCells);
 
-  while (!processQueue.empty()) {
-    Cell& cell = processQueue.front();
+  while (!processQueue.Empty()) {
+    Cell& cell = processQueue.Front();
     if (nextLiveCells.count(cell) == 0) {
+      // Add neighbours if necessary
+      if (cell.isAlive) {
+        if (cell.x < ULONG_MAX) {
+          processQueue.Push(Cell(cell.x+1, cell.y, false));
+          if (cell.y < ULONG_MAX) {
+            processQueue.Push(Cell(cell.x+1, cell.y+1, false));
+          }
+          if (cell.y > 0) {
+            processQueue.Push(Cell(cell.x+1, cell.y-1, false));
+          }
+        }
+        if (cell.y < ULONG_MAX) {
+          processQueue.Push(Cell(cell.x, cell.y+1, false));
+        }
+        if (cell.x > 0) {
+          processQueue.Push(Cell(cell.x-1, cell.y, false));
+          if (cell.y < ULONG_MAX) {
+            processQueue.Push(Cell(cell.x-1, cell.y+1, false));
+          }
+          if (cell.y > 0) {
+            processQueue.Push(Cell(cell.x-1, cell.y-1, false));
+          }
+        }
+        if (cell.y > 0) {
+          processQueue.Push(Cell(cell.x, cell.y-1, false));
+        }
+      }
       int numNeighbours = NumNeighbours(cell);
-      if (numNeighbours == 3) {
+      if (numNeighbours == 3 || (cell.isAlive && numNeighbours == 2)) {
+        cell.isAlive = true;
         nextLiveCells.insert(cell);
       }
-      if (cell.isAlive) {
-        processQueue.push(Cell(cell.x-1, cell.y-1));
-        processQueue.push(Cell(cell.x-1, cell.y));
-        processQueue.push(Cell(cell.x-1, cell.y+1));
-        processQueue.push(Cell(cell.x, cell.y-1));
-        processQueue.push(Cell(cell.x, cell.y+1));
-        processQueue.push(Cell(cell.x+1, cell.y-1));
-        processQueue.push(Cell(cell.x+1, cell.y));
-        processQueue.push(Cell(cell.x+1, cell.y+1));
-      }
-      processQueue.pop();
+      processQueue.Pop();
     }
   }
 
   _liveCells = nextLiveCells;
   MarkAlive(_liveCells);
+  chrono::milliseconds dura(500);
+  this_thread::sleep_for( dura );
 }
 
 

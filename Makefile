@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-I.
-OBJ = quadtree.o game.o main.o
+OBJ = cellQueue.o quadtree.o game.o main.o
 
 %.o: %.c
 	$(CC) -c -o $@ $< $(CFLAGS)
