@@ -35,6 +35,7 @@ QuadTree::~QuadTree() {
   Clear();
 }
 
+
 void QuadTree::Clear() {
   _cells.clear();
   if (_upperLeft != NULL) {

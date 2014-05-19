@@ -33,6 +33,8 @@ struct ViewInfo {
 
   void Init(int width, int height, unsigned long x, unsigned long y);
 
+  void Centre(unsigned long x, unsigned long y);
+
   inline void UpdateBox();
 
   inline int GetHorizontalCells() const {
@@ -86,6 +88,8 @@ public:
   void InsertCell(const Cell& cell);
 
   void RemoveCell(const Cell& cell);
+
+  Cell FindNearest(const Cell& cell) const;
 
   // Reset to initial set
   void Reset();

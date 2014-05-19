@@ -79,6 +79,12 @@ void ViewInfo::Resize(int width, int height) {
   cout << "New horizontal cells: " << GetHorizontalCells() << " vertical: " << GetVerticalCells() << endl;
 }
 
+void ViewInfo::Centre(unsigned long x, unsigned long y) {
+  xCentre = x;
+  yCentre = y;
+  UpdateBox();
+}
+
 inline void ViewInfo::UpdateBox() {
   // Add 1 to width and height to get cells that
   // are only partially on-screen.
@@ -145,6 +151,41 @@ GameBoard::GameBoard(const CellSet& points)
     cout << "Initial point " << it->x << " " << it->y << endl;
     _quadTree.Insert(*it);
   } 
+}
+
+Cell GameBoard::FindNearest(const Cell& cell) const {
+  if (_liveCells.count(cell)) {
+    return cell;
+  }
+  // Select random cell, find all cells in the minimal bounding
+  // box such that the random cell is on the edge.
+  // Repeat until there is only one cell in the bounding box.
+  CellSet candidateSet = _liveCells;
+  srand(time(0));
+  while (candidateSet.size() > 1) {
+    int index = rand() % candidateSet.size();
+    CellSet::iterator it = candidateSet.begin();
+    for (int i = 0; i < index; ++i) {
+      ++it;
+      assert(it != candidateSet.end());
+    }
+    Cell nextCandidate = *it;
+    unsigned long boxWidth = (nextCandidate.x > cell.x) ?
+                             nextCandidate.x - cell.x :
+                             cell.x - nextCandidate.x;
+    unsigned long boxHeight = (nextCandidate.y > cell.y) ?
+                              nextCandidate.y - cell.y :
+                              cell.y - nextCandidate.y;
+    unsigned long boxX = cell.x >= (0 + boxWidth) ? cell.x - boxWidth : 0;
+    unsigned long boxY = cell.y >= (0 + boxHeight) ? cell.y - boxHeight : 0;
+
+    candidateSet.clear();
+    _quadTree.FindPoints(BoundingBox(boxX, boxY, boxWidth * 2, boxHeight * 2), candidateSet);
+    cout << candidateSet.size() << endl;
+  }
+  assert(candidateSet.size() == 1);
+  return *candidateSet.begin();
+  
 }
 
 void GameBoard::KillAll() {
@@ -361,6 +402,9 @@ void Game::Start() {
             _view.Zoom(ViewInfo::ZOOM_IN);
           } else if (event.key.code == sf::Keyboard::X) {
             _view.Zoom(ViewInfo::ZOOM_OUT);
+          } else if (event.key.code == sf::Keyboard::J) {
+            const Cell& nearest = _gameBoard.FindNearest(Cell(_view.xCentre, _view.yCentre));
+            _view.Centre(nearest.x, nearest.y);
           }
           break;
         case sf::Event::MouseButtonReleased:
