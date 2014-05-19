@@ -21,14 +21,14 @@ bool BoundingBox::ContainsGreedy(unsigned long x,
 }
 
 bool BoundingBox::Intersects(const BoundingBox& box) const {
-  return ContainsGreedy(box._x, box._y) ||
-         ContainsGreedy(box._x, box._y + box._height) ||
-         ContainsGreedy(box._x + box._width, box._y) ||
-         ContainsGreedy(box._x + box._width, box._y + box._height) ||
-         box.ContainsGreedy(_x, _y) ||
-         box.ContainsGreedy(_x, _y + _height) ||
-         box.ContainsGreedy(_x + _width, _y) ||
-         box.ContainsGreedy(_x + _width, _y + _height);
+  return !((box._x < (ULONG_MAX - box._width) &&
+            _x > (box._x + box._width)) ||
+           (_x < (ULONG_MAX - _width) &&
+           (_x + _width) < box._x) ||
+           (box._y < (ULONG_MAX - box._height) &&
+            _y > (box._y + box._height)) ||
+           (_y < (ULONG_MAX - _height) &&
+           (_y + _height) < box._y));
 }
 
 QuadTree::~QuadTree() {

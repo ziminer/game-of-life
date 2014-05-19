@@ -28,18 +28,29 @@ struct ViewInfo {
 
   int screenWidth;
   int screenHeight;
-  int xCentre;
-  int yCentre;
+  unsigned long xCentre;
+  unsigned long yCentre;
+
+  void Init(int width, int height, unsigned long x, unsigned long y);
+
+  inline void UpdateBox();
 
   inline int GetHorizontalCells() const {
     return viewBox._width;
   }
+
   inline int GetVerticalCells() const {
     return viewBox._height;
   }
+
   inline void Move(MoveDirection direction);
+
   inline void Zoom(ZoomDirection direction);
+
+  // Converts a position on the screen to a
+  // cell coordinate
   Cell PosnToCell(int x, int y);
+
 };
 
 /**
@@ -69,6 +80,10 @@ public:
   GameBoard(const CellSet& cells);
 
   void Draw(const ViewInfo& view, sf::RenderTarget& texture, bool running) const;
+
+  void InsertCell(const Cell& cell);
+
+  void RemoveCell(const Cell& cell);
 
   // Reset to initial set
   void Reset();
