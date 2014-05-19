@@ -16,6 +16,7 @@
 
 class GameBoard {
 private:
+  CellSet _initialCells;
   CellSet _liveCells;
 
   /*
@@ -34,7 +35,10 @@ private:
 public:
   GameBoard(const CellSet& cells);
 
-  void Draw(sf::RenderTarget& texture);
+  void Draw(sf::RenderTarget& texture) const;
+
+  // Reset to initial set
+  void Reset();
 
   void Update();
 };

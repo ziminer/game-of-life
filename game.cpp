@@ -13,7 +13,8 @@
 using namespace std;
 
 GameBoard::GameBoard(const CellSet& points)
-  : _liveCells(points), _quadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX))
+  : _initialCells(points), _liveCells(points),
+    _quadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX))
 {
   for (CellSet::const_iterator it = points.begin();
        it != points.end(); ++it) {
@@ -33,6 +34,13 @@ void GameBoard::MarkAlive(const CellSet& cells) {
     assert(it->isAlive);
     _quadTree.Insert(*it);
   } 
+  chrono::milliseconds dura(500);
+  this_thread::sleep_for( dura );
+}
+
+void GameBoard::Reset() {
+  _liveCells = _initialCells; 
+  MarkAlive(_liveCells);
 }
 
 int GameBoard::NumNeighbours(const Cell& cell) {
@@ -62,7 +70,7 @@ int GameBoard::NumNeighbours(const Cell& cell) {
   return cell.isAlive ? neighbours.size() - 1 : neighbours.size();
 }
 
-void GameBoard::Draw(sf::RenderTarget& texture) {
+void GameBoard::Draw(sf::RenderTarget& texture) const {
   const sf::Vector2u& size = texture.getSize();
   const int cellSize = 20;
   const int horizontalCells = size.x / cellSize;
@@ -94,12 +102,6 @@ void GameBoard::Draw(sf::RenderTarget& texture) {
 
 
 void GameBoard::Update() {
-  if (!_liveCells.empty()) {
-    cout << "--------" << endl;
-    for (CellSet::iterator it = _liveCells.begin(); it != _liveCells.end(); ++it) {
-      cout << "Alive cell x: " << it->x << " y: " << it->y << endl;
-    }
-  }
   CellSet nextLiveCells;
   CellQueue processQueue(_liveCells);
 
@@ -144,8 +146,6 @@ void GameBoard::Update() {
 
   _liveCells = nextLiveCells;
   MarkAlive(_liveCells);
-  chrono::milliseconds dura(500);
-  this_thread::sleep_for( dura );
 }
 
 
@@ -157,20 +157,31 @@ void Game::Start() {
   window.setVerticalSyncEnabled(true);
 
   while (window.isOpen()) {
-    sf::Event event;
-    while (window.pollEvent(event)) {
-      if (event.type == sf::Event::Closed) {
-        window.close();
-      }
-    }
-
     window.clear(sf::Color::Black);
-
     _gameBoard.Draw(window);
-
     window.display();
 
-    _gameBoard.Update();
+    if (_running) {
+      _gameBoard.Update();
+    }
+
+    sf::Event event;
+    while (window.pollEvent(event)) {
+      switch (event.type) {
+        case sf::Event::Closed:
+          window.close();
+          break;
+        case sf::Event::KeyReleased:
+          if (event.key.code == sf::Keyboard::Space) {
+            _running = !_running;
+          } else if (event.key.code == sf::Keyboard::R) {
+            _gameBoard.Reset();
+          }
+          break;
+        default:
+          break;
+      }
+    }
   }
 }
 

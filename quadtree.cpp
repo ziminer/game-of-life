@@ -53,6 +53,7 @@ void QuadTree::Clear() {
     delete _lowerRight;
     _lowerRight = NULL;
   }
+  assert(_cells.empty());
 }
 
 void QuadTree::Divide() {
