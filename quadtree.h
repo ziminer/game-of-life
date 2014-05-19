@@ -50,7 +50,9 @@ public:
 
 /*
  * Simple region quadtree implementation, with the limit
- * per region at 1.
+ * per region at 1. Stores Cell objects.
+ *
+ * TODO: (not important) make template
  *
  * See: http://en.wikipedia.org/wiki/Quadtree
  */

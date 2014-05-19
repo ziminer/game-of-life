@@ -3,6 +3,8 @@
 
 #include <vector>
 
+#include <SFML/Graphics.hpp>
+
 #include "cell.h"
 #include "quadtree.h"
 
@@ -32,7 +34,7 @@ private:
 public:
   GameBoard(const CellSet& cells);
 
-  void Draw();
+  void Draw(sf::RenderTarget& texture);
 
   void Update();
 };

@@ -1,9 +1,13 @@
-#include "game.h"
 #include <queue>
 #include <cassert>
 #include <iostream>
 #include <thread>
 #include <chrono>
+
+#include <SFML/Window.hpp>
+#include <SFML/Graphics.hpp>
+
+#include "game.h"
 #include "cellQueue.h"
 
 using namespace std;
@@ -58,8 +62,36 @@ int GameBoard::NumNeighbours(const Cell& cell) {
   return cell.isAlive ? neighbours.size() - 1 : neighbours.size();
 }
 
-void GameBoard::Draw() {
+void GameBoard::Draw(sf::RenderTarget& texture) {
+  const sf::Vector2u& size = texture.getSize();
+  const int cellSize = 20;
+  const int horizontalCells = size.x / cellSize;
+  const int verticalCells = size.y / cellSize;
+  for (int x = 0; x < horizontalCells; ++x) {
+    for (int y = 0; y < verticalCells; ++y) {
+      sf::CircleShape shape(cellSize/2);
+      shape.setFillColor(sf::Color::Black);
+      shape.setOutlineThickness(1);
+      shape.setOutlineColor(sf::Color(100, 250, 0));
+      shape.setPosition(x * cellSize, y * cellSize);
+      texture.draw(shape);
+    }
+  }
+  BoundingBox box(9223372036854775800, 9223372036854775800, horizontalCells, verticalCells);
+  CellSet liveCells;
+  _quadTree.FindPoints(box, liveCells);
+  for (CellSet::iterator it = liveCells.begin(); it != liveCells.end(); ++it) {
+    int xOffset = it->x - box._x;
+    int yOffset = it->y - box._y;
+    sf::CircleShape shape(cellSize/2);
+    shape.setFillColor(sf::Color(100, 250, 0));
+    shape.setOutlineThickness(1);
+    shape.setOutlineColor(sf::Color::Black);
+    shape.setPosition(xOffset * cellSize, yOffset * cellSize);
+    texture.draw(shape);
+  }
 }
+
 
 void GameBoard::Update() {
   if (!_liveCells.empty()) {
@@ -119,8 +151,25 @@ void GameBoard::Update() {
 
 void Game::Start() {
   _running = true;
-  while (_running) {
-    _gameBoard.Draw();
+  sf::ContextSettings settings;
+  settings.antialiasingLevel = 8;
+  sf::RenderWindow window(sf::VideoMode(800, 600), "Game of Life", sf::Style::Default, settings);
+  window.setVerticalSyncEnabled(true);
+
+  while (window.isOpen()) {
+    sf::Event event;
+    while (window.pollEvent(event)) {
+      if (event.type == sf::Event::Closed) {
+        window.close();
+      }
+    }
+
+    window.clear(sf::Color::Black);
+
+    _gameBoard.Draw(window);
+
+    window.display();
+
     _gameBoard.Update();
   }
 }
