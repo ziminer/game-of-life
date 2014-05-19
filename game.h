@@ -8,6 +8,39 @@
 #include "cell.h"
 #include "quadtree.h"
 
+struct ViewInfo {
+
+  enum MoveDirection {
+    MOVE_UP,
+    MOVE_DOWN,
+    MOVE_LEFT,
+    MOVE_RIGHT,
+  };
+
+  enum ZoomDirection {
+    ZOOM_IN,
+    ZOOM_OUT,
+  };
+
+  BoundingBox viewBox;
+
+  int cellSize;
+
+  int screenWidth;
+  int screenHeight;
+  int xCentre;
+  int yCentre;
+
+  inline int GetHorizontalCells() const {
+    return viewBox._width;
+  }
+  inline int GetVerticalCells() const {
+    return viewBox._height;
+  }
+  inline void Move(MoveDirection direction);
+  inline void Zoom(ZoomDirection direction);
+  Cell PosnToCell(int x, int y);
+};
 
 /**
  * The board abstraction represents the entire game board. It's mostly a
@@ -35,7 +68,7 @@ private:
 public:
   GameBoard(const CellSet& cells);
 
-  void Draw(sf::RenderTarget& texture) const;
+  void Draw(const ViewInfo& view, sf::RenderTarget& texture, bool running) const;
 
   // Reset to initial set
   void Reset();
@@ -55,6 +88,8 @@ private:
   bool _running;
 
   GameBoard _gameBoard;
+
+  ViewInfo _view;
 
 public:
   Game(const CellSet& startingPoints)
