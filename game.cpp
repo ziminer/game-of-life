@@ -70,6 +70,15 @@ void ViewInfo::Init(int width, int height, unsigned long x, unsigned long y) {
   UpdateBox();
 }
 
+void ViewInfo::Resize(int width, int height) {
+  cout << "Old width: " << screenWidth << " height: " << screenHeight << " new width: " << width << " height: " << height << endl;
+  screenWidth = width;
+  screenHeight = height;
+  
+  UpdateBox();
+  cout << "New horizontal cells: " << GetHorizontalCells() << " vertical: " << GetVerticalCells() << endl;
+}
+
 inline void ViewInfo::UpdateBox() {
   // Add 1 to width and height to get cells that
   // are only partially on-screen.
@@ -302,6 +311,7 @@ void Game::Start() {
   int msBetweenUpdates = DEFAULT_UPDATE_TIME;
 
   sf::Clock clock;
+  bool resized = false;
   while (window.isOpen()) {
 
     Draw(window);
@@ -318,6 +328,9 @@ void Game::Start() {
       switch (event.type) {
         case sf::Event::Closed:
           window.close();
+          break;
+        case sf::Event::Resized:
+          resized = true;
           break;
         case sf::Event::KeyPressed:
           if (event.key.code == sf::Keyboard::Up) {
@@ -369,6 +382,24 @@ void Game::Start() {
         default:
           break;
       }
+    }
+    if (resized) {
+      int newWidth = window.getSize().x;
+      int newHeight = window.getSize().y;
+      _view.Resize(newWidth, newHeight);
+      // Need to create a new window because SFML changes
+      // the pixel density of a window properly after resize.
+      //  i.e. width 10 for a shape maps to a different number
+      //       of pixels before vs after resize
+      const sf::Vector2i& prevPosn = window.getPosition();
+      window.create(
+        sf::VideoMode(newWidth, newHeight),
+        GAME_NAME,
+        sf::Style::Default,
+        settings);
+      window.setPosition(prevPosn);
+      Draw(window);
+      resized = false;
     }
   }
 }

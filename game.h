@@ -47,6 +47,8 @@ struct ViewInfo {
 
   inline void Zoom(ZoomDirection direction);
 
+  void Resize(int newWidth, int newHeight);
+
   // Converts a position on the screen to a
   // cell coordinate
   Cell PosnToCell(int x, int y);
