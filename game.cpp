@@ -142,6 +142,33 @@ Cell ViewInfo::PosnToCell(int x, int y) {
   return Cell(cellX, cellY);
 }
 
+TextBox::TextBox() {
+  if (!font.loadFromFile("font.ttf")) {
+    cerr << "Font not loading!" << endl;
+  } else {
+    cout << "Font loaded" << endl;
+  }
+  buffer.clear();
+  assert(buffer.empty());
+}
+
+inline void TextBox::Clear() {
+  prefix.clear();
+  buffer.clear();
+}
+
+void TextBox::Draw(sf::RenderTarget& texture) const {
+  if (buffer.empty() && prefix.empty()) {
+    return;
+  }
+  sf::Text text;
+  text.setFont(font);
+  text.setString(prefix + buffer);
+  text.setCharacterSize(20);
+  text.setColor(sf::Color::Black);
+  texture.draw(text);
+}
+
 GameBoard::GameBoard(const CellSet& points)
   : _initialCells(points), _liveCells(points),
     _quadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX))
@@ -205,15 +232,11 @@ void GameBoard::Reset() {
   MarkAlive(_liveCells);
 }
 
-void GameBoard::InsertCell(const Cell& cell) {
+void GameBoard::FlipCell(const Cell& cell) {
   if (_liveCells.count(cell) == 0) {
     _quadTree.Insert(cell);
     _liveCells.insert(cell);
-  }
-}
-
-void GameBoard::RemoveCell(const Cell& cell) {
-  if (_liveCells.count(cell) == 1) {
+  } else {
     CellSet::iterator it = _liveCells.find(cell);
     assert(it != _liveCells.end());
     _liveCells.erase(it);
@@ -330,6 +353,7 @@ void GameBoard::Update() {
 void Game::Draw(sf::RenderWindow& window) const {
   window.clear(sf::Color(253, 246, 227));
   _gameBoard.Draw(_view, window, _running);
+  _inputBuffer.Draw(window);
   window.display();
 }
 
@@ -353,6 +377,9 @@ void Game::Start() {
 
   sf::Clock clock;
   bool resized = false;
+  bool collectInput = false;
+  bool collectJump = false;
+  bool collectCentre = false;
   while (window.isOpen()) {
 
     Draw(window);
@@ -373,6 +400,16 @@ void Game::Start() {
         case sf::Event::Resized:
           resized = true;
           break;
+        case sf::Event::TextEntered:
+          // Ignore non-ASCI-alpha-numeric characters, except space and dash
+          if (collectInput &&
+              (event.text.unicode == 32 || event.text.unicode == 45 ||
+               (event.text.unicode >= 48 && event.text.unicode <= 57) ||
+               (event.text.unicode >= 65 && event.text.unicode <= 90) ||
+               (event.text.unicode >= 97 && event.text.unicode <= 122))) {
+            _inputBuffer.buffer += static_cast<char>(event.text.unicode);
+          }
+          break;
         case sf::Event::KeyPressed:
           if (event.key.code == sf::Keyboard::Up) {
             _view.Move(ViewInfo::MOVE_UP);
@@ -385,48 +422,91 @@ void Game::Start() {
           }
           break;
         case sf::Event::KeyReleased:
-          if (event.key.code == sf::Keyboard::Space) {
+          if (event.key.code == sf::Keyboard::BackSpace && collectInput) {
+            _inputBuffer.buffer.pop_back();
+          }
+          if (event.key.code == sf::Keyboard::Return && collectInput) {
+            collectInput = false;
+            assert(!(collectJump && collectCentre));
+            if ((collectJump || collectCentre) && !_inputBuffer.buffer.empty()) {
+              size_t sep = _inputBuffer.buffer.find(" ");
+              if (sep != string::npos) {
+                // TODO: check for out-of-bounds
+                string xStr = _inputBuffer.buffer.substr(0, sep);
+                string yStr = _inputBuffer.buffer.substr(sep+1);
+                long x = atol(xStr.c_str());
+                long y = atol(yStr.c_str());
+                // TODO: deal with strings like 0000
+                if (!((xStr != "0" && x == 0) || (yStr != "0" && x == 0))) {
+                  // Need to adjust coords to unsigned long
+                  unsigned long xUl = x + LONG_MAX + 1;
+                  unsigned long yUl = y + LONG_MAX + 1; 
+                  if (collectJump) {
+                    _view.Centre(xUl, yUl);
+                  } else if (collectCentre) {
+                    // TODO: Deal with empty board
+                    const Cell& nearest = _gameBoard.FindNearest(Cell(xUl, yUl));
+                    _view.Centre(nearest.x, nearest.y);
+                  }
+                }
+              }
+            } else if (collectCentre) {
+              // Jump to nearest from current view
+              const Cell& nearest = _gameBoard.FindNearest(Cell(_view.xCentre, _view.yCentre));
+              _view.Centre(nearest.x, nearest.y);
+            }
+            collectCentre = false;
+            collectJump = false;
+            _inputBuffer.Clear();
+          } else if (event.key.code == sf::Keyboard::Q && !collectInput) {
+            collectInput = true;
+            collectJump = true;
+            _inputBuffer.prefix = "Go to nearest: ";
+          } else if (event.key.code == sf::Keyboard::Space && !collectInput) {
             _running = !_running;
             clock.restart();
-          } else if (event.key.code == sf::Keyboard::R) {
+          } else if (event.key.code == sf::Keyboard::R && !collectInput) {
             _gameBoard.Reset();
             clock.restart(); 
             Draw(window);
           } else if (event.key.code == sf::Keyboard::Equal &&
-                     event.key.shift) {
+                     event.key.shift && !collectInput) {
             msBetweenUpdates = max(msBetweenUpdates - UPDATE_INCREMENT, MIN_UPDATE_TIME);
           } else if (event.key.code == sf::Keyboard::Equal &&
-                     !event.key.shift) {
+                     !event.key.shift && !collectInput) {
             msBetweenUpdates = min(msBetweenUpdates + UPDATE_INCREMENT, MAX_UPDATE_TIME);
-          } else if (event.key.code == sf::Keyboard::Z) {
+          } else if (event.key.code == sf::Keyboard::Z && !collectInput) {
             _view.Zoom(ViewInfo::ZOOM_IN);
-          } else if (event.key.code == sf::Keyboard::X) {
+          } else if (event.key.code == sf::Keyboard::X && !collectInput) {
             _view.Zoom(ViewInfo::ZOOM_OUT);
-          } else if (event.key.code == sf::Keyboard::J) {
-            const Cell& nearest = _gameBoard.FindNearest(Cell(_view.xCentre, _view.yCentre));
-            _view.Centre(nearest.x, nearest.y);
+          } else if (event.key.code == sf::Keyboard::J && !collectInput) {
+            _inputBuffer.prefix = "Centre at nearest: ";
+            collectInput = true;
+            collectCentre = true;
           }
           break;
         case sf::Event::MouseButtonReleased:
-          if (event.mouseButton.button == sf::Mouse::Left && !_running) {
+          if (event.mouseButton.button == sf::Mouse::Right && !_running) {
             try {
-              _gameBoard.InsertCell(_view.PosnToCell(event.mouseButton.x,
-                                                     event.mouseButton.y));
+              _gameBoard.FlipCell(_view.PosnToCell(event.mouseButton.x,
+                                                   event.mouseButton.y));
             } catch (const out_of_range& err) {
-              cerr << "Out of range error when trying to insert cell" << endl;
+              cerr << "Out of range error when trying to modify cell" << endl;
             }
-          } else if (event.mouseButton.button == sf::Mouse::Right && !_running) {
+          } else if (event.mouseButton.button == sf::Mouse::Left) {
             try {
-              _gameBoard.RemoveCell(_view.PosnToCell(event.mouseButton.x,
-                                                     event.mouseButton.y));
+              const Cell& clickedCell = _view.PosnToCell(event.mouseButton.x,
+                                                         event.mouseButton.y);
+              _view.Centre(clickedCell.x, clickedCell.y);
             } catch (const out_of_range& err) {
-              cerr << "Out of range error when trying to remove cell" << endl;
+              cerr << "Out of range when trying to navigate" << endl;
             }
           }
         default:
           break;
       }
     }
+
     if (resized) {
       int newWidth = window.getSize().x;
       int newHeight = window.getSize().y;

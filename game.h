@@ -57,6 +57,15 @@ struct ViewInfo {
 
 };
 
+struct TextBox {
+  sf::Font font;
+  std::string prefix;
+  std::string buffer;
+  TextBox();
+  void Draw(sf::RenderTarget& texture) const;
+  void Clear();
+};
+
 /**
  * The board abstraction represents the entire game board. It's mostly a
  * container for the cells with some methods to manipulate them.
@@ -85,9 +94,7 @@ public:
 
   void Draw(const ViewInfo& view, sf::RenderTarget& texture, bool running) const;
 
-  void InsertCell(const Cell& cell);
-
-  void RemoveCell(const Cell& cell);
+  void FlipCell(const Cell& cell);
 
   Cell FindNearest(const Cell& cell) const;
 
@@ -107,6 +114,7 @@ public:
 class Game {
 private:
   bool _running;
+  TextBox _inputBuffer;
 
   GameBoard _gameBoard;
 
