@@ -3,6 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <algorithm>
 
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
@@ -11,6 +12,22 @@
 #include "cellQueue.h"
 
 using namespace std;
+
+static const int MIN_UPDATE_TIME = 100;
+
+static const int MAX_UPDATE_TIME = 5000;
+
+static const int UPDATE_INCREMENT = 50;
+
+static const int DEFAULT_UPDATE_TIME = 500;
+
+static const int ANTI_ALIASING_LEVEL = 8;
+
+static const string GAME_NAME = "Game of Life";
+
+static const int DEFAULT_WINDOW_WIDTH = 800;
+
+static const int DEFAULT_WINDOW_HEIGHT = 600;
 
 GameBoard::GameBoard(const CellSet& points)
   : _initialCells(points), _liveCells(points),
@@ -34,8 +51,6 @@ void GameBoard::MarkAlive(const CellSet& cells) {
     assert(it->isAlive);
     _quadTree.Insert(*it);
   } 
-  chrono::milliseconds dura(500);
-  this_thread::sleep_for( dura );
 }
 
 void GameBoard::Reset() {
@@ -148,18 +163,31 @@ void GameBoard::Update() {
   MarkAlive(_liveCells);
 }
 
+void Game::Draw(sf::RenderWindow& window) const {
+  window.clear(sf::Color::Black);
+  _gameBoard.Draw(window);
+  window.display();
+}
 
 void Game::Start() {
   _running = true;
   sf::ContextSettings settings;
-  settings.antialiasingLevel = 8;
-  sf::RenderWindow window(sf::VideoMode(800, 600), "Game of Life", sf::Style::Default, settings);
+  settings.antialiasingLevel = ANTI_ALIASING_LEVEL;
+  sf::RenderWindow window(
+    sf::VideoMode(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT),
+    GAME_NAME,
+    sf::Style::Default,
+    settings);
+
   window.setVerticalSyncEnabled(true);
 
+  int msBetweenUpdates = DEFAULT_UPDATE_TIME;
+
+  sf::Clock clock;
   while (window.isOpen()) {
-    window.clear(sf::Color::Black);
-    _gameBoard.Draw(window);
-    window.display();
+    clock.restart();
+
+    Draw(window);
 
     if (_running) {
       _gameBoard.Update();
@@ -176,12 +204,23 @@ void Game::Start() {
             _running = !_running;
           } else if (event.key.code == sf::Keyboard::R) {
             _gameBoard.Reset();
+            Draw(window);
+          } else if (event.key.code == sf::Keyboard::Equal &&
+                     event.key.shift) {
+            msBetweenUpdates = max(msBetweenUpdates - UPDATE_INCREMENT, MIN_UPDATE_TIME);
+          } else if (event.key.code == sf::Keyboard::Equal &&
+                     !event.key.shift) {
+            msBetweenUpdates = min(msBetweenUpdates + UPDATE_INCREMENT, MAX_UPDATE_TIME);
           }
           break;
         default:
           break;
       }
     }
+
+    sf::Time elapsed = clock.getElapsedTime();
+    int timeDiff = msBetweenUpdates - elapsed.asMilliseconds();
+    this_thread::sleep_for(chrono::milliseconds(max(timeDiff, 0)));
   }
 }
 

@@ -60,6 +60,8 @@ public:
   Game(const CellSet& startingPoints)
     : _gameBoard(startingPoints) {}
 
+  void Draw(sf::RenderWindow& window) const;
+
   void Start();
 };
 
