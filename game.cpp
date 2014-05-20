@@ -466,8 +466,8 @@ void Game::LoadPatterns() {
         }
         // Input format in signed long, but want to deal with unsigned
         // long internally so convert here.
-        unsigned long adjustedX = x + LONG_MAX + 1;
-        unsigned long adjustedY = y + LONG_MAX + 1;
+        unsigned long adjustedX = (x > LONG_MAX) ? x : x + LONG_MAX + 1;
+        unsigned long adjustedY = (y > LONG_MAX) ? y : y + LONG_MAX + 1;
         patternCells.push_back(Cell(adjustedX, adjustedY));
       }
     }
@@ -598,19 +598,7 @@ void Game::Start() {
           }
           break;
         case sf::Event::KeyReleased:
-          if (event.key.code == sf::Keyboard::S && event.key.control) {
-            ofstream patternFile (_patternFileName);
-            if (patternFile.is_open()) {
-              for (vector<CellPattern>::iterator it = _patterns.begin(); it != _patterns.end(); ++it) {
-                for (CellPattern::iterator it2 = it->begin(); it2 != it->end(); ++it2) {
-                  cout << it2->x << " " << it2->y << endl;
-                }
-                cout << endl;
-              }
-            } else {
-              cerr << "Unable to open file to save patterns" << endl;
-            }
-          } else if (event.key.code == sf::Keyboard::LShift && buildingPattern) {
+          if (event.key.code == sf::Keyboard::LShift && buildingPattern) {
             buildingPattern = false;
             patternIndex = 0;
           } else if (event.key.code == sf::Keyboard::BackSpace && collectInput) {

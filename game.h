@@ -144,11 +144,13 @@ private:
 
   std::vector<CellPattern> _patterns;
 
+  const std::string& _patternFileName;
+
   CellPattern *_activePattern;
 
   ViewInfo _view;
 
-  void LoadPatterns(const std::string& patternFileName);
+  void LoadPatterns();
 
 public:
   Game(const CellSet& startingPoints, const std::string& patternFileName);
