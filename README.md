@@ -19,7 +19,7 @@ Simple implementation of [Conway's Game of Life](http://en.wikipedia.org/wiki/Co
 * Right click a cell to centre the screen on the cell.
 * `g` + two numbers with a space inbetween + `ENTER` to centre the screen on a coordinate.
 * `j` + two numbers with a space inbetween + `ENTER` to jump to the nearest neighbour to a coordinate.
-* `j` + ENTER to jump to nearest neighbour.
+* `j` + `ENTER` to jump to nearest neighbour.
 * `z` to zoom in.
 * `x` to zoom out.
 
