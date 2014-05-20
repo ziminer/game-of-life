@@ -39,9 +39,10 @@ static const int MIN_CELL_SIZE = 5;
 
 static const sf::Color BACKGROUND_COLOUR = sf::Color(253, 246, 227);
 
+static const sf::Color CELL_COLOUR = sf::Color(88,110,117);
+
 static const sf::Color GRID_COLOUR = sf::Color(238, 232, 213);
 
-static const sf::Color CELL_COLOUR = sf::Color(88,110,117);
 
 inline void ViewInfo::Move(MoveDirection direction) {
   switch (direction) {
@@ -171,11 +172,11 @@ void TextBox::Draw(sf::RenderTarget& texture) const {
 
 GameBoard::GameBoard(const CellSet& points)
   : _initialCells(points), _liveCells(points),
-    _quadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX))
+    _quadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX)),
+    _changeQuadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX))
 {
   for (CellSet::const_iterator it = points.begin();
        it != points.end(); ++it) {
-    cout << "Initial point " << it->x << " " << it->y << endl;
     _quadTree.Insert(*it);
   } 
 }
@@ -218,30 +219,56 @@ Cell GameBoard::FindNearest(const Cell& cell) const {
 void GameBoard::KillAll() {
 }
 
-void GameBoard::MarkAlive(const CellSet& cells) {
-  _quadTree.Clear();
+void GameBoard::MarkAlive(const CellSet& cells, QuadTree& tree) {
+  tree.Clear();
   for (CellSet::iterator it = cells.begin();
        it != cells.end(); ++it) {
-    assert(it->isAlive);
-    _quadTree.Insert(*it);
+    tree.Insert(*it);
   } 
 }
 
 void GameBoard::Reset() {
   _liveCells = _initialCells; 
-  MarkAlive(_liveCells);
+  MarkAlive(_liveCells, _quadTree);
 }
 
-void GameBoard::FlipCell(const Cell& cell) {
-  if (_liveCells.count(cell) == 0) {
-    _quadTree.Insert(cell);
-    _liveCells.insert(cell);
+void GameBoard::ChangeCell(const Cell& cell) {
+  if (_changedCells.count(cell) == 0) {
+    // First insert
+    if (_liveCells.count(cell) == 0) {
+      _changedCells.insert(cell);
+      _changeQuadTree.Insert(cell);
+    } else {
+      _changedCells.insert(Cell(cell.x, cell.y, false));
+    }
   } else {
-    CellSet::iterator it = _liveCells.find(cell);
-    assert(it != _liveCells.end());
-    _liveCells.erase(it);
-    MarkAlive(_liveCells);
+    // Back-out of insert
+    CellSet::iterator it = _changedCells.find(cell);
+    assert(it != _changedCells.end());
+    _changedCells.erase(it);
+    MarkAlive(_changedCells, _changeQuadTree);
   }
+}
+
+void GameBoard::CommitChanges() {
+  for (CellSet::iterator it = _changedCells.begin(); it != _changedCells.end(); ++it) {
+    if (it->isAlive) {
+      _liveCells.insert(*it);
+    } else {
+      CellSet::iterator liveIt = _liveCells.find(*it);
+      // If there's a DELETE change the cell should have been alive
+      assert(liveIt != _liveCells.end());
+      _liveCells.erase(liveIt);
+    }
+  }
+  MarkAlive(_liveCells, _quadTree);
+  _changedCells.clear();
+  _changeQuadTree.Clear();
+}
+
+void GameBoard::UndoChanges() {
+  _changedCells.clear();
+  _changeQuadTree.Clear();
 }
 
 int GameBoard::NumNeighbours(const Cell& cell) {
@@ -291,15 +318,23 @@ void GameBoard::Draw(const ViewInfo& view,
   CellSet liveCells;
   _quadTree.FindPoints(view.viewBox, liveCells);
   for (CellSet::iterator it = liveCells.begin(); it != liveCells.end(); ++it) {
-    int xOffset = it->x - view.viewBox._x;
-    int yOffset = it->y - view.viewBox._y;
-    sf::CircleShape shape(view.cellSize/2);
-    shape.setFillColor(CELL_COLOUR);
-    shape.setOutlineThickness(1);
-    shape.setOutlineColor(BACKGROUND_COLOUR);
-    shape.setPosition(xOffset * view.cellSize, yOffset * view.cellSize);
-    texture.draw(shape);
+    // If stopped, don't draw cells that are deleted
+    if (!running) {
+      CellSet::iterator changesIt = _changedCells.find(*it);
+      if (changesIt != _changedCells.end() && !changesIt->isAlive) {
+      continue;
+      }
+    }
+    it->Draw(view, texture, CELL_COLOUR);
   }
+  if (!running) {
+    CellSet changedCells;
+    _changeQuadTree.FindPoints(view.viewBox, changedCells);
+    for (CellSet::iterator it = changedCells.begin(); it != changedCells.end(); ++it) {
+      it->Draw(view, texture, GRID_COLOUR);
+    }
+  }
+
 }
 
 
@@ -347,7 +382,7 @@ void GameBoard::Update() {
   }
 
   _liveCells = nextLiveCells;
-  MarkAlive(_liveCells);
+  MarkAlive(_liveCells, _quadTree);
 }
 
 void Game::Draw(sf::RenderWindow& window) const {
@@ -463,8 +498,20 @@ void Game::Start() {
             collectJump = true;
             _inputBuffer.prefix = "Go to nearest: ";
           } else if (event.key.code == sf::Keyboard::Space && !collectInput) {
+            if (!_running) {
+              _gameBoard.CommitChanges();
+            }
             _running = !_running;
             clock.restart();
+          } else if (event.key.code == sf::Keyboard::Escape) {
+            if (!_running) {
+              _gameBoard.UndoChanges();
+            }
+            if (collectInput || collectJump) {
+              collectInput = false;
+              collectJump = false;
+              _inputBuffer.Clear();
+            }
           } else if (event.key.code == sf::Keyboard::R && !collectInput) {
             _gameBoard.Reset();
             clock.restart(); 
@@ -488,7 +535,7 @@ void Game::Start() {
         case sf::Event::MouseButtonReleased:
           if (event.mouseButton.button == sf::Mouse::Right && !_running) {
             try {
-              _gameBoard.FlipCell(_view.PosnToCell(event.mouseButton.x,
+              _gameBoard.ChangeCell(_view.PosnToCell(event.mouseButton.x,
                                                    event.mouseButton.y));
             } catch (const out_of_range& err) {
               cerr << "Out of range error when trying to modify cell" << endl;

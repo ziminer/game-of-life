@@ -2,6 +2,9 @@
 #define __CELL_H__
 
 #include <unordered_set>
+#include <SFML/Graphics.hpp>
+
+struct ViewInfo;
 
 /**
  * A cell as described in Conway's Game of Life.
@@ -16,6 +19,8 @@ public:
   unsigned long y;
 
   bool isAlive;
+
+  void Draw(const ViewInfo& view, sf::RenderTarget& texture, sf::Color colour) const;
 
   Cell(unsigned long x, unsigned long y) : x(x), y(y), isAlive(true) {}
 

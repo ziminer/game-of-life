@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-I.
-OBJ = cellQueue.o quadtree.o game.o main.o
+OBJ = cell.o cellQueue.o quadtree.o game.o main.o
 LIBS = -lsfml-graphics -lsfml-window -lsfml-system
 
 %.o: %.c

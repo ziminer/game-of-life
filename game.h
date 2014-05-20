@@ -74,7 +74,10 @@ struct TextBox {
 class GameBoard {
 private:
   CellSet _initialCells;
+
   CellSet _liveCells;
+
+  CellSet _changedCells;
 
   /*
    * Keep cells in a quad tree so that we don't have to track dead cells.
@@ -83,9 +86,11 @@ private:
    */
   QuadTree _quadTree;
 
+  QuadTree _changeQuadTree;
+
   void KillAll();
 
-  void MarkAlive(const CellSet& cells);
+  void MarkAlive(const CellSet& cells, QuadTree& tree);
 
   int NumNeighbours(const Cell& cell);
 
@@ -94,7 +99,11 @@ public:
 
   void Draw(const ViewInfo& view, sf::RenderTarget& texture, bool running) const;
 
-  void FlipCell(const Cell& cell);
+  void ChangeCell(const Cell& cell);
+
+  void CommitChanges();
+
+  void UndoChanges();
 
   Cell FindNearest(const Cell& cell) const;
 
