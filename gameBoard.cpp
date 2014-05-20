@@ -149,14 +149,25 @@ ViewInfo::Zoom(ZoomDirection direction) {
 Cell
 ViewInfo::PosnToCell(int x,
                      int y) {
+  /*
+   * What to do with the remainder after the division depends on
+   * which quadrand we're in.
+   */
   int xDiff = (x - (screenWidth / 2)) / cellSize;
-  int yDiff = (y - (screenHeight / 2)) / cellSize;
-
-  // If negative, adjust to compensate for rounding
-  unsigned long xDiffUl = (xDiff >= 0) ? abs(xDiff) : abs(xDiff) + 1;
-  unsigned long yDiffUl = (yDiff >= 0) ? abs(yDiff) : abs(yDiff) + 1;
-  return Cell(ApplyOffset(xCentre, xDiffUl, xDiff < 0),
-              ApplyOffset(yCentre, yDiffUl, yDiff < 0));
+  int xDiffRemainder = (x - (screenWidth / 2)) % cellSize;
+  if (xDiff < 0 || (xDiff == 0 && xDiffRemainder < 0)) {
+    xDiffRemainder = xDiffRemainder == 0 ? 0 : xDiffRemainder / xDiffRemainder;
+    xDiff = (xDiffRemainder > 0) ? xDiff - xDiffRemainder : xDiff + xDiffRemainder;
+  }
+  int yDiff = (y - (screenHeight / 2)) / cellSize; 
+  int yDiffRemainder = (y - (screenHeight / 2)) % cellSize;
+  if (yDiff < 0 || (yDiff == 0 && yDiffRemainder < 0)) {
+    yDiffRemainder = yDiffRemainder == 0 ? 0 : yDiffRemainder / yDiffRemainder;
+    yDiff = (yDiffRemainder > 0) ? yDiff - yDiffRemainder : yDiff + yDiffRemainder;
+  }
+  
+  return Cell(ApplyOffset(xCentre, abs(xDiff), xDiff < 0),
+              ApplyOffset(yCentre, abs(yDiff), yDiff < 0));
 }
 
 
