@@ -1,14 +1,15 @@
 #include <set>
 #include <unordered_set>
 #include <utility>
-#include "game.h"
-#include "cellQueue.h"
-#include "quadtree.h"
 #include <iostream>
 #include <cassert>
 #include <fstream>
 #include <string>
 #include <cstdlib>
+
+#include "game.h"
+#include "gameBoard.h"
+#include "utils.h"
 
 using namespace std;
 
@@ -211,6 +212,7 @@ int main(int argc, char ** argv) {
 
   Game game(starterSet, "patterns.cfg");
   game.Start();
+  cout << "Exiting..." << endl;
 
   return 0;
 }

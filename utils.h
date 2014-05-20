@@ -2,7 +2,26 @@
 #define __QUADTREE_H__
 
 #include <vector>
+#include <queue>
+
 #include "cell.h"
+
+
+/*
+ * Throws out_of_range if adding/subtracting offset causes overflow.
+ */
+
+unsigned long
+ApplyOffset(unsigned long target,
+            unsigned long offset,
+            bool neg);
+
+
+unsigned long
+CalculateOffset(unsigned long from,
+                unsigned long to,
+                bool *neg);
+
 
 /**
  * Rectangle for collision detection
@@ -35,16 +54,57 @@ public:
    * This is so that each point is in only one
    * leaf node of the quadtree.
    */
-  bool Contains(unsigned long x,
-                unsigned long y) const;
+  bool
+  Contains(unsigned long x,
+           unsigned long y) const;
 
   // All points along the edge count.
-  bool ContainsGreedy(unsigned long x,
-                      unsigned long y) const;
+  bool
+  ContainsGreedy(unsigned long x,
+                 unsigned long y) const;
 
-  void Print() const;
+  bool
+  Intersects(const BoundingBox& box) const;
+};
 
-  bool Intersects(const BoundingBox& box) const;
+
+/**
+ * Utility class - queue that rejects duplicates.
+ *
+ * We can only insert an element into this queue once.
+ * Cannot insert an equal element even if we pop the
+ * original one.
+ *
+ * TODO: (low priority) make template
+ */
+class CellQueue {
+private:
+  std::queue<Cell> _queue;
+
+  CellSet _elements;
+
+public:
+  CellQueue() {}
+
+  CellQueue(const CellSet& cells)
+    : _elements(cells) {
+    for (CellSet::const_iterator it = cells.begin();
+         it != cells.end(); ++it) {
+      _queue.push(*it);
+    }
+  }
+
+  bool
+  Push(const Cell& cell);
+
+  Cell&
+  Front();
+
+  bool
+  Empty() const;
+
+  void
+  Pop();
 };
 
 
@@ -71,7 +131,8 @@ private:
 
   QuadTree *_lowerRight;
 
-  void Divide();
+  void
+  Divide();
 
 public:
   QuadTree(const BoundingBox& boundary)
@@ -80,15 +141,15 @@ public:
 
   ~QuadTree();
 
-  void Clear();
+  void
+  Clear();
 
-  bool Insert(const Cell& point);
+  bool
+  Insert(const Cell& point);
 
-  void FindPoints(const BoundingBox& bound,
-                  CellSet& out) const;
-
-  // Debugging method
-  void Print();
+  void
+  FindPoints(const BoundingBox& bound,
+             CellSet& out) const;
 
 };
 

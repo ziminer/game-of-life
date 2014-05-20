@@ -1,26 +1,62 @@
-#include "quadtree.h"
 #include <cassert>
 #include <iostream>
+#include <queue>
+
+#include "utils.h"
 
 using namespace std;
 
-void BoundingBox::Print() const {
-  cout << "x: " << _x << " y: " << _y << " width: " << _width << " height: " << _height << endl;
+
+unsigned long
+ApplyOffset(unsigned long target,
+            unsigned long offset,
+            bool neg) {
+  if (neg) {
+    if (offset > target) {
+      throw out_of_range("Offset causes overflow");
+    }
+    return target - offset;
+  } else {
+    if (target > (ULONG_MAX - offset)) {
+      throw out_of_range("Offset causes overflow");
+    }
+    return target + offset;
+  }
 }
 
-bool BoundingBox::Contains(unsigned long x,
-                           unsigned long y) const {
+
+unsigned long
+CalculateOffset(unsigned long from,
+                unsigned long to,
+                bool *neg) {
+  if (from > to) {
+      *neg = true;
+      return from - to;
+  } else {
+      *neg = false;
+      return to - from;
+  }
+}
+
+
+bool
+BoundingBox::Contains(unsigned long x,
+                      unsigned long y) const {
   return x > _x && x <= (_x + _width) &&
          y >= _y && y < (_y + _height);
 }
 
-bool BoundingBox::ContainsGreedy(unsigned long x,
-                           unsigned long y) const {
+
+bool
+BoundingBox::ContainsGreedy(unsigned long x,
+                            unsigned long y) const {
   return x >= _x && x <= (_x + _width) &&
          y >= _y && y <= (_y + _height);
 }
 
-bool BoundingBox::Intersects(const BoundingBox& box) const {
+
+bool
+BoundingBox::Intersects(const BoundingBox& box) const {
   return !((box._x < (ULONG_MAX - box._width) &&
             _x > (box._x + box._width)) ||
            (_x < (ULONG_MAX - _width) &&
@@ -31,12 +67,14 @@ bool BoundingBox::Intersects(const BoundingBox& box) const {
            (_y + _height) < box._y));
 }
 
+
 QuadTree::~QuadTree() {
   Clear();
 }
 
 
-void QuadTree::Clear() {
+void
+QuadTree::Clear() {
   _cells.clear();
   if (_upperLeft != NULL) {
     delete _upperLeft;
@@ -57,7 +95,38 @@ void QuadTree::Clear() {
   assert(_cells.empty());
 }
 
-void QuadTree::Divide() {
+
+bool
+CellQueue::Push(const Cell& cell) {
+  if (_elements.insert(cell).second) {
+    _queue.push(cell);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+
+Cell&
+CellQueue::Front() {
+  return _queue.front();
+}
+
+
+bool
+CellQueue::Empty() const {
+  return _queue.empty();
+}
+
+
+void
+CellQueue::Pop() {
+  _queue.pop();
+}
+
+
+void
+QuadTree::Divide() {
   // Should only be called once
   if (_upperLeft != NULL) {
     return;
@@ -86,22 +155,9 @@ void QuadTree::Divide() {
   assert(_cells.empty());
 }
 
-void QuadTree::Print() {
-  if (_upperLeft != NULL) {
-    assert(_cells.empty());
-    _upperLeft->Print();
-    _upperRight->Print();
-    _lowerLeft->Print();
-    _lowerRight->Print();
-  } else {
-    for (vector<Cell>::const_iterator it = _cells.begin();
-         it != _cells.end(); ++it) {
-      cout << "x: " << it->x << " y: " << it->y << endl;
-    }
-  }
-}
 
-bool QuadTree::Insert(const Cell& cell) {
+bool
+QuadTree::Insert(const Cell& cell) {
   if (_boundary.Contains(cell.x, cell.y)) {
     if (_cells.empty() && _upperLeft == NULL) {
       _cells.push_back(cell);
@@ -126,8 +182,10 @@ bool QuadTree::Insert(const Cell& cell) {
   }
 }
 
-void QuadTree::FindPoints(const BoundingBox& bound,
-                          CellSet& out) const {
+
+void
+QuadTree::FindPoints(const BoundingBox& bound,
+                     CellSet& out) const {
   if (_boundary.Intersects(bound)) {
     if (_upperLeft == NULL) {
       // This is a leaf node. Check it!
@@ -147,3 +205,4 @@ void QuadTree::FindPoints(const BoundingBox& bound,
     }
   }
 }
+
