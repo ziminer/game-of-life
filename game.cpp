@@ -432,8 +432,8 @@ void GameBoard::Update() {
   MarkAlive(_liveCells, _quadTree);
 }
 
-void Game::LoadPatterns(const string& patternFileName) {
-  ifstream patternFile(patternFileName);
+void Game::LoadPatterns() {
+  ifstream patternFile(_patternFileName);
   string line;
   if (patternFile.is_open()) {
     CellPattern patternCells;
@@ -478,8 +478,8 @@ void Game::LoadPatterns(const string& patternFileName) {
 }
 
 Game::Game(const CellSet& startingPoints, const string& patternFileName)
-  : _gameBoard(startingPoints), _activePattern(NULL) {
-  LoadPatterns(patternFileName);
+  : _gameBoard(startingPoints), _activePattern(NULL), _patternFileName(patternFileName) {
+  LoadPatterns();
 }
 
 void Game::Draw(sf::RenderWindow& window) const {
@@ -542,6 +542,8 @@ void Game::Start() {
   bool collectInput = false;
   bool collectJump = false;
   bool collectCentre = false;
+  bool buildingPattern = false;
+  int patternIndex = 0;
   while (window.isOpen()) {
 
     Draw(window);
@@ -563,7 +565,8 @@ void Game::Start() {
           resized = true;
           break;
         case sf::Event::MouseMoved:
-          if (_activePattern != NULL) {
+        {
+          if (_activePattern != NULL && !buildingPattern) {
             assert(!_running);
             if (event.mouseMove.x >= 0 && event.mouseMove.x <= _view.screenWidth &&
                 event.mouseMove.y >= 0 && event.mouseMove.y <= _view.screenHeight) {
@@ -572,6 +575,7 @@ void Game::Start() {
             }
           }
           break;
+        }
         case sf::Event::TextEntered:
           // Ignore non-ASCI-alpha-numeric characters, except space and dash
           if (collectInput &&
@@ -594,10 +598,24 @@ void Game::Start() {
           }
           break;
         case sf::Event::KeyReleased:
-          if (event.key.code == sf::Keyboard::BackSpace && collectInput) {
+          if (event.key.code == sf::Keyboard::S && event.key.control) {
+            ofstream patternFile (_patternFileName);
+            if (patternFile.is_open()) {
+              for (vector<CellPattern>::iterator it = _patterns.begin(); it != _patterns.end(); ++it) {
+                for (CellPattern::iterator it2 = it->begin(); it2 != it->end(); ++it2) {
+                  cout << it2->x << " " << it2->y << endl;
+                }
+                cout << endl;
+              }
+            } else {
+              cerr << "Unable to open file to save patterns" << endl;
+            }
+          } else if (event.key.code == sf::Keyboard::LShift && buildingPattern) {
+            buildingPattern = false;
+            patternIndex = 0;
+          } else if (event.key.code == sf::Keyboard::BackSpace && collectInput) {
             _inputBuffer.buffer.pop_back();
-          }
-          if (event.key.code == sf::Keyboard::Return && collectInput) {
+          } else if (event.key.code == sf::Keyboard::Return && collectInput) {
             collectInput = false;
             assert(!(collectJump && collectCentre));
             if ((collectJump || collectCentre) && !_inputBuffer.buffer.empty()) {
@@ -641,6 +659,7 @@ void Game::Start() {
                 _gameBoard.UndoPattern();
                 _activePattern = NULL;
               }
+              patternIndex = 0;
             }
             _running = !_running;
             clock.restart();
@@ -652,6 +671,14 @@ void Game::Start() {
               collectInput = false;
               collectJump = false;
               _inputBuffer.Clear();
+            }
+            if (buildingPattern) {
+              buildingPattern = false;
+              _patterns.pop_back();
+            }
+            if (_activePattern != NULL) {
+              _gameBoard.UndoPattern();
+              _activePattern = NULL;
             }
           } else if (event.key.code == sf::Keyboard::R && !collectInput) {
             _gameBoard.Reset();
@@ -679,9 +706,9 @@ void Game::Start() {
               const Cell& mouseCell = _view.PosnToCell(mousePosition.x, mousePosition.y);
               _gameBoard.ApplyPattern(*_activePattern, mouseCell);
             }
-          } else if (event.key.code == sf::Keyboard::Num1 && !_running) {
+          } else if (event.key.code == sf::Keyboard::Tab && !_running && !buildingPattern) {
             if (_patterns.size() > 0) {
-              _activePattern = &_patterns.at(1);
+              _activePattern = &_patterns.at(patternIndex++ % _patterns.size());
               sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
               if (mousePosition.x >= 0 && mousePosition.x <= _view.screenWidth &&
                   mousePosition.y >= 0 && mousePosition.y <= _view.screenHeight) {
@@ -692,9 +719,20 @@ void Game::Start() {
           }
           break;
         case sf::Event::MouseButtonReleased:
-          if (event.mouseButton.button == sf::Mouse::Right && !_running) {
+          if (event.mouseButton.button == sf::Mouse::Left && !_running) {
             try {
-              if (_activePattern == NULL) {
+              if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
+                if (_activePattern == NULL) {
+                  _patterns.push_back(CellPattern());
+                  _activePattern = &_patterns.at(_patterns.size()-1);
+                  buildingPattern = true;
+                }
+                if (buildingPattern) {
+                  _activePattern->push_back(_view.PosnToCell(event.mouseButton.x,
+                                                            event.mouseButton.y));
+                  _gameBoard.ApplyPattern(*_activePattern, *(_activePattern->begin()));
+                }
+              } else if (_activePattern == NULL) {
                 _gameBoard.ChangeCell(_view.PosnToCell(event.mouseButton.x,
                                                      event.mouseButton.y));
               } else {
@@ -704,7 +742,7 @@ void Game::Start() {
             } catch (const out_of_range& err) {
               cerr << "Out of range error when trying to modify cell" << endl;
             }
-          } else if (event.mouseButton.button == sf::Mouse::Left) {
+          } else if (event.mouseButton.button == sf::Mouse::Right) {
             try {
               const Cell& clickedCell = _view.PosnToCell(event.mouseButton.x,
                                                          event.mouseButton.y);
