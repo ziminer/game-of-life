@@ -249,6 +249,7 @@ Game::ExitBuildMode() {
 void
 Game::ClearState() {
   _patternIndex = 0;
+  _inputBuffer.Clear();
   // If placing a pattern, don't clear the other in-progress changes.
   if (!_running && _activePattern == NULL) {
     _gameBoard.UndoChanges();
@@ -256,7 +257,6 @@ Game::ClearState() {
   if (_collectInput || _collectJump) {
     _collectInput = false;
     _collectJump = false;
-    _inputBuffer.Clear();
   }
   if (_buildingPattern) {
     _buildingPattern = false;
@@ -327,19 +327,32 @@ Game::Start() {
           }
           break;
         case sf::Event::KeyReleased:
-          if (event.key.code == sf::Keyboard::LShift && _buildingPattern) {
-            _buildingPattern = false;
-            _patternIndex = 0;
+          if (event.key.code == sf::Keyboard::P && !_collectInput) {
+            if (_buildingPattern) {
+              _buildingPattern = false;
+              _patternIndex = 0;
+              _inputBuffer.prefix.clear();
+            } else {
+              _inputBuffer.Clear();
+              _inputBuffer.prefix = "Recording Pattern...";
+              if (_activePattern == NULL) {
+                _patterns.push_back(CellSet());
+                _activePattern = &_patterns.at(_patterns.size()-1);
+                _buildingPattern = true;
+              }
+            }
           } else if (event.key.code == sf::Keyboard::BackSpace &&
                      _collectInput) {
             _inputBuffer.buffer.pop_back();
           } else if (event.key.code == sf::Keyboard::Return &&
                      _collectInput) {
             ActOnInput();
-          } else if (event.key.code == sf::Keyboard::G && !_collectInput) {
+          } else if (event.key.code == sf::Keyboard::G && !_collectInput &&
+                     !_buildingPattern) {
             _collectInput = true;
             _collectJump = true;
-            _inputBuffer.prefix = "Go to nearest: ";
+            _inputBuffer.Clear();
+            _inputBuffer.prefix = "Go to: ";
           } else if (event.key.code == sf::Keyboard::Space && !_collectInput) {
             ExitBuildMode();
             clock.restart();
@@ -361,7 +374,9 @@ Game::Start() {
             _view.Zoom(ViewInfo::ZOOM_IN);
           } else if (event.key.code == sf::Keyboard::X && !_collectInput) {
             _view.Zoom(ViewInfo::ZOOM_OUT);
-          } else if (event.key.code == sf::Keyboard::J && !_collectInput) {
+          } else if (event.key.code == sf::Keyboard::J && !_collectInput &&
+                     !_buildingPattern) {
+            _inputBuffer.Clear();
             _inputBuffer.prefix = "Centre at nearest: ";
             _collectInput = true;
             _collectCentre = true;
@@ -381,24 +396,18 @@ Game::Start() {
         case sf::Event::MouseButtonReleased:
           if (event.mouseButton.button == sf::Mouse::Left && !_running) {
             try {
-              // Building a pattern 
-              if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
-                // No pattern in progress
-                if (_activePattern == NULL) {
-                  _patterns.push_back(CellSet());
-                  _activePattern = &_patterns.at(_patterns.size()-1);
-                  _buildingPattern = true;
-                }
-                if (_buildingPattern) {
-                  _activePattern->insert(_view.PosnToCell(event.mouseButton.x,
-                                                          event.mouseButton.y));
-                  _gameBoard.ApplyPattern(*_activePattern,
-                                          *(_activePattern->begin()));
-                }
+              // Pattern in progress
+              if (_buildingPattern) {
+                assert(_activePattern != NULL);
+                _activePattern->insert(_view.PosnToCell(event.mouseButton.x,
+                                                        event.mouseButton.y));
+                _gameBoard.ApplyPattern(*_activePattern,
+                                        *(_activePattern->begin()));
               } else if (_activePattern == NULL) {
                 _gameBoard.ChangeCell(_view.PosnToCell(event.mouseButton.x,
                                                      event.mouseButton.y));
               } else {
+                // Left click with a pattern selected commits pattern
                 _gameBoard.CommitPattern();
                 _activePattern = NULL;
               }

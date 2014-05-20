@@ -33,7 +33,7 @@ Simple implementation of [Conway's Game of Life](http://en.wikipedia.org/wiki/Co
 * Drag mouse to move pattern around.
 * `e` to rotate pattern.
 * Left click to activate/deactivate.
-* Hold `SHIFT` and left click on cells to create a pattern (finalized when you let go of `SHIFT`). This pattern will also become available via `TAB`.
+* Press `p` to begin recording a pattern. `p` when done, or `ESC` to drop.  This pattern will also become available via `TAB`.
 * `ESC` to discard pattern.
 
 ### Known Issues:
