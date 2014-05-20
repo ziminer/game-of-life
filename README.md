@@ -13,6 +13,7 @@ Simple implementation of [Conway's Game of Life](http://en.wikipedia.org/wiki/Co
 * `+` to speed up the simulation.
 * `=` to slow down the simulation.
 * `r` to reset to initial configuration.
+
 #### Navigation:
 * Arrow keys to move.
 * Right click a cell to centre the screen on the cell.
@@ -21,10 +22,12 @@ Simple implementation of [Conway's Game of Life](http://en.wikipedia.org/wiki/Co
 * `j` + ENTER to jump to nearest neighbour.
 * `z` to zoom in.
 * `x` to zoom out.
+
 #### Build:
 * `SPACE` to pause and go into build mode.
 * Left click on a cell to activate/deactivate it.
 * `ESC` to discard all changes.
+
 #### Build - Patterns:
 * In build mode, `TAB` to cycle through the available cell patterns.
 * Drag mouse to move pattern around.
