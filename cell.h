@@ -2,6 +2,7 @@
 #define __CELL_H__
 
 #include <unordered_set>
+#include <vector>
 #include <SFML/Graphics.hpp>
 
 struct ViewInfo;
@@ -48,5 +49,7 @@ struct CellHash {
 };
 
 typedef std::unordered_set<Cell, CellHash> CellSet;
+
+typedef std::vector<Cell> CellPattern;
 
 #endif

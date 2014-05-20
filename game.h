@@ -79,6 +79,8 @@ private:
 
   CellSet _changedCells;
 
+  CellPattern _pattern;
+
   /*
    * Keep cells in a quad tree so that we don't have to track dead cells.
    * Tracking dead cells in a ULONG_MAX by ULONG_MAX grid would not be a
@@ -88,11 +90,17 @@ private:
 
   QuadTree _changeQuadTree;
 
+  QuadTree _patternQuadTree;
+
   void KillAll();
 
   void MarkAlive(const CellSet& cells, QuadTree& tree);
 
+  void MarkPattern();
+
   int NumNeighbours(const Cell& cell);
+
+  int ActivateCell(const Cell& cell);
 
 public:
   GameBoard(const CellSet& cells);
@@ -103,7 +111,13 @@ public:
 
   void CommitChanges();
 
+  void ApplyPattern(const CellPattern& pattern, const Cell& refCell);
+
+  void CommitPattern();
+
   void UndoChanges();
+
+  void UndoPattern();
 
   Cell FindNearest(const Cell& cell) const;
 
@@ -123,17 +137,25 @@ public:
 class Game {
 private:
   bool _running;
+
   TextBox _inputBuffer;
 
   GameBoard _gameBoard;
 
+  std::vector<CellPattern> _patterns;
+
+  CellPattern *_activePattern;
+
   ViewInfo _view;
 
+  void LoadPatterns(const std::string& patternFileName);
+
 public:
-  Game(const CellSet& startingPoints)
-    : _gameBoard(startingPoints) {}
+  Game(const CellSet& startingPoints, const std::string& patternFileName);
 
   void Draw(sf::RenderWindow& window) const;
+
+  void RotatePattern();
 
   void Start();
 };

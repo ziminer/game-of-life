@@ -178,7 +178,7 @@ int main(int argc, char ** argv) {
     return 1;
   }
 
-  ifstream configFile (fileName);
+  ifstream configFile(fileName);
   string line;
   if (configFile.is_open()) {
     while (getline(configFile, line)) {
@@ -209,7 +209,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  Game game(starterSet);
+  Game game(starterSet, "patterns.cfg");
   game.Start();
 
   return 0;

@@ -4,6 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <algorithm>
+#include <fstream>
 
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
@@ -44,19 +45,43 @@ static const sf::Color CELL_COLOUR = sf::Color(88,110,117);
 static const sf::Color GRID_COLOUR = sf::Color(238, 232, 213);
 
 
+static unsigned long ApplyOffset(unsigned long target, unsigned long offset, bool neg) {
+  if (neg) {
+    if (offset > target) {
+      throw out_of_range("Offset causes overflow");
+    }
+    return target - offset;
+  } else {
+    if (target > (ULONG_MAX - offset)) {
+      throw out_of_range("Offset causes overflow");
+    }
+    return target + offset;
+  }
+}
+
+static unsigned long CalculateOffset(unsigned long from, unsigned long to, bool *neg) {
+  if (from > to) {
+      *neg = true;
+      return from - to;
+  } else {
+      *neg = false;
+      return to - from;
+  }
+}
+
 inline void ViewInfo::Move(MoveDirection direction) {
   switch (direction) {
     case MOVE_UP:
-      yCentre = max(yCentre - 1, (unsigned long) 0);
+      yCentre = ApplyOffset(yCentre, 1, true);
       break;
     case MOVE_DOWN:
-      yCentre = min(yCentre + 1, ULONG_MAX);
+      yCentre = ApplyOffset(yCentre, 1, false);
       break;
     case MOVE_LEFT:
-      xCentre = max(xCentre - 1, (unsigned long) 0);
+      xCentre = ApplyOffset(xCentre, 1, true);
       break;
     case MOVE_RIGHT:
-      xCentre = min(xCentre + 1, ULONG_MAX);
+      xCentre = ApplyOffset(xCentre, 1, false);
       break;
   }
   UpdateBox();
@@ -72,12 +97,10 @@ void ViewInfo::Init(int width, int height, unsigned long x, unsigned long y) {
 }
 
 void ViewInfo::Resize(int width, int height) {
-  cout << "Old width: " << screenWidth << " height: " << screenHeight << " new width: " << width << " height: " << height << endl;
   screenWidth = width;
   screenHeight = height;
   
   UpdateBox();
-  cout << "New horizontal cells: " << GetHorizontalCells() << " vertical: " << GetVerticalCells() << endl;
 }
 
 void ViewInfo::Centre(unsigned long x, unsigned long y) {
@@ -111,36 +134,10 @@ Cell ViewInfo::PosnToCell(int x, int y) {
   int xDiff = (x - (screenWidth / 2)) / cellSize;
   int yDiff = (y - (screenHeight / 2)) / cellSize;
 
-  unsigned long cellX;
-  unsigned long cellY;
-  unsigned long xDiffUl = abs(xDiff);
-  unsigned long yDiffUl = abs(yDiff);
-  if (xDiff < 0) {
-    if (xDiffUl > xCentre) {
-      throw out_of_range("New cell coords overflow");
-    }
-    // Adjust to compensate for rounding
-    cellX = xCentre - xDiffUl - 1;
-  } else {
-    if (xCentre > (ULONG_MAX - xDiffUl)) {
-      throw out_of_range("New cell coords overflow");
-    }
-    cellX = xCentre + xDiffUl;
-  }
-
-  if (yDiff < 0) {
-    if (yDiffUl > yCentre) {
-      throw out_of_range("New cell coords overflow");
-    }
-    // Adjust to compensate for rounding
-    cellY = yCentre - yDiffUl - 1;
-  } else {
-    if (yCentre > (ULONG_MAX - yDiffUl)) {
-      throw out_of_range("New cell coords overflow");
-    }
-    cellY = yCentre + yDiffUl;
-  }
-  return Cell(cellX, cellY);
+  // If negative, adjust to compensate for rounding
+  unsigned long xDiffUl = (xDiff >= 0) ? abs(xDiff) : abs(xDiff) + 1;
+  unsigned long yDiffUl = (yDiff >= 0) ? abs(yDiff) : abs(yDiff) + 1;
+  return Cell(ApplyOffset(xCentre, xDiffUl, xDiff < 0), ApplyOffset(yCentre, yDiffUl, yDiff < 0));
 }
 
 TextBox::TextBox() {
@@ -173,7 +170,8 @@ void TextBox::Draw(sf::RenderTarget& texture) const {
 GameBoard::GameBoard(const CellSet& points)
   : _initialCells(points), _liveCells(points),
     _quadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX)),
-    _changeQuadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX))
+    _changeQuadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX)),
+    _patternQuadTree(BoundingBox(0, 0, ULONG_MAX, ULONG_MAX))
 {
   for (CellSet::const_iterator it = points.begin();
        it != points.end(); ++it) {
@@ -209,7 +207,6 @@ Cell GameBoard::FindNearest(const Cell& cell) const {
 
     candidateSet.clear();
     _quadTree.FindPoints(BoundingBox(boxX, boxY, boxWidth * 2, boxHeight * 2), candidateSet);
-    cout << candidateSet.size() << endl;
   }
   assert(candidateSet.size() == 1);
   return *candidateSet.begin();
@@ -225,6 +222,13 @@ void GameBoard::MarkAlive(const CellSet& cells, QuadTree& tree) {
        it != cells.end(); ++it) {
     tree.Insert(*it);
   } 
+}
+
+void GameBoard::MarkPattern() {
+  _patternQuadTree.Clear();
+  for (CellPattern::iterator it = _pattern.begin(); it != _pattern.end(); ++it) {
+    _patternQuadTree.Insert(*it);
+  }
 }
 
 void GameBoard::Reset() {
@@ -269,6 +273,11 @@ void GameBoard::CommitChanges() {
 void GameBoard::UndoChanges() {
   _changedCells.clear();
   _changeQuadTree.Clear();
+}
+
+void GameBoard::UndoPattern() {
+  _pattern.clear();
+  _patternQuadTree.Clear();
 }
 
 int GameBoard::NumNeighbours(const Cell& cell) {
@@ -333,8 +342,46 @@ void GameBoard::Draw(const ViewInfo& view,
     for (CellSet::iterator it = changedCells.begin(); it != changedCells.end(); ++it) {
       it->Draw(view, texture, GRID_COLOUR);
     }
+
+    CellSet patternCells;
+    _patternQuadTree.FindPoints(view.viewBox, patternCells);
+    for (CellSet::iterator it = patternCells.begin(); it != patternCells.end(); ++it) {
+      it->Draw(view, texture, GRID_COLOUR);
+    }
   }
 
+}
+
+void GameBoard::ApplyPattern(const CellPattern& pattern, const Cell& refCell) {
+  UndoPattern();
+  // By convention - first cell will be centre
+  CellPattern::const_iterator it = pattern.cbegin();
+  bool xOffsetNeg;
+  bool yOffsetNeg;
+  unsigned long xOffset = CalculateOffset(it->x, refCell.x, &xOffsetNeg);
+  unsigned long yOffset = CalculateOffset(it->y, refCell.y, &yOffsetNeg);
+
+  for (;it != pattern.cend(); ++it) {
+    try {
+      unsigned long newX = ApplyOffset(it->x, xOffset, xOffsetNeg);
+      unsigned long newY = ApplyOffset(it->y, yOffset, yOffsetNeg);
+      _pattern.push_back(Cell(newX, newY));
+    } catch (const out_of_range& err) {
+      // Can't apply pattern
+      _pattern.clear();
+      break;
+    }
+  }
+  MarkPattern();
+}
+
+void GameBoard::CommitPattern() {
+  for (CellPattern::iterator patternIt = _pattern.begin(); patternIt != _pattern.end(); ++patternIt) {
+    _changedCells.insert(*patternIt);
+  }
+  MarkAlive(_changedCells, _changeQuadTree);
+  _patternQuadTree.Clear();
+  _pattern.clear();
 }
 
 
@@ -385,6 +432,56 @@ void GameBoard::Update() {
   MarkAlive(_liveCells, _quadTree);
 }
 
+void Game::LoadPatterns(const string& patternFileName) {
+  ifstream patternFile(patternFileName);
+  string line;
+  if (patternFile.is_open()) {
+    CellPattern patternCells;
+    while (getline(patternFile, line)) {
+      if (line.empty()) {
+        _patterns.push_back(patternCells);
+        patternCells.clear();
+        continue;
+      }
+      size_t pos = line.find(" ");
+      if (pos == string::npos) {
+        cerr << "Invalid config line. Expecting space-separated longs" << endl;
+        patternCells.clear();
+        break;
+      } else {
+        string xStr = line.substr(0, pos);
+        string yStr = line.substr(pos+1);
+        long x = atol(xStr.c_str());
+        // TODO: (not important) what if string is 0000
+        if (x == 0 && xStr != "0") {
+          cerr << "Could not convert " << xStr << " to long" << endl;
+          patternCells.clear();
+          break;
+        }
+        long y = atol(yStr.c_str());
+        if (y == 0 && yStr != "0") {
+          cerr << "Could not convert " << yStr << " to long" << endl;
+          patternCells.clear();
+          break;
+        }
+        // Input format in signed long, but want to deal with unsigned
+        // long internally so convert here.
+        unsigned long adjustedX = x + LONG_MAX + 1;
+        unsigned long adjustedY = y + LONG_MAX + 1;
+        patternCells.push_back(Cell(adjustedX, adjustedY));
+      }
+    }
+    if (!patternCells.empty()) {
+      _patterns.push_back(patternCells);
+    }
+  }
+}
+
+Game::Game(const CellSet& startingPoints, const string& patternFileName)
+  : _gameBoard(startingPoints), _activePattern(NULL) {
+  LoadPatterns(patternFileName);
+}
+
 void Game::Draw(sf::RenderWindow& window) const {
   window.clear(sf::Color(253, 246, 227));
   _gameBoard.Draw(_view, window, _running);
@@ -392,6 +489,36 @@ void Game::Draw(sf::RenderWindow& window) const {
   window.display();
 }
 
+void Game::RotatePattern() {
+  assert(_activePattern != NULL);
+  // Rotate around first element in pattern
+  CellPattern newPattern;
+  CellPattern::iterator it = _activePattern->begin();
+  const Cell& origin = *it;
+  newPattern.push_back(origin);
+  for (++it; it != _activePattern->end(); ++it) {
+    try {
+      bool xOffsetNeg;
+      bool yOffsetNeg;
+      unsigned long xOffset = CalculateOffset(origin.x, it->x, &xOffsetNeg);
+      unsigned long yOffset = CalculateOffset(origin.y, it->y, &yOffsetNeg);
+      bool newXOffsetNeg = !yOffsetNeg;
+      bool newYOffsetNeg = xOffsetNeg;
+      unsigned long xNewOffset = yOffset;
+      unsigned long yNewOffset = xOffset;
+      unsigned long newX = ApplyOffset(origin.x, xNewOffset, newXOffsetNeg);
+      unsigned long newY = ApplyOffset(origin.y, yNewOffset, newYOffsetNeg);
+      newPattern.push_back(Cell(newX, newY));
+    } catch (const out_of_range& err) {
+      // Can't apply pattern
+      newPattern.clear();
+      break;
+    }
+  }
+  if (!newPattern.empty()) {
+    _activePattern->swap(newPattern);
+  }
+}
 void Game::Start() {
   _running = true;
   sf::ContextSettings settings;
@@ -434,6 +561,16 @@ void Game::Start() {
           break;
         case sf::Event::Resized:
           resized = true;
+          break;
+        case sf::Event::MouseMoved:
+          if (_activePattern != NULL) {
+            assert(!_running);
+            if (event.mouseMove.x >= 0 && event.mouseMove.x <= _view.screenWidth &&
+                event.mouseMove.y >= 0 && event.mouseMove.y <= _view.screenHeight) {
+              const Cell& mouseCell = _view.PosnToCell(event.mouseMove.x, event.mouseMove.y);
+              _gameBoard.ApplyPattern(*_activePattern, mouseCell);
+            }
+          }
           break;
         case sf::Event::TextEntered:
           // Ignore non-ASCI-alpha-numeric characters, except space and dash
@@ -500,6 +637,10 @@ void Game::Start() {
           } else if (event.key.code == sf::Keyboard::Space && !collectInput) {
             if (!_running) {
               _gameBoard.CommitChanges();
+              if (_activePattern != NULL) {
+                _gameBoard.UndoPattern();
+                _activePattern = NULL;
+              }
             }
             _running = !_running;
             clock.restart();
@@ -530,13 +671,36 @@ void Game::Start() {
             _inputBuffer.prefix = "Centre at nearest: ";
             collectInput = true;
             collectCentre = true;
+          } else if (_activePattern != NULL && event.key.code == sf::Keyboard::E && !collectInput) {
+            RotatePattern();
+            sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
+            if (mousePosition.x >= 0 && mousePosition.x <= _view.screenWidth &&
+                mousePosition.y >= 0 && mousePosition.y <= _view.screenHeight) {
+              const Cell& mouseCell = _view.PosnToCell(mousePosition.x, mousePosition.y);
+              _gameBoard.ApplyPattern(*_activePattern, mouseCell);
+            }
+          } else if (event.key.code == sf::Keyboard::Num1 && !_running) {
+            if (_patterns.size() > 0) {
+              _activePattern = &_patterns.at(1);
+              sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
+              if (mousePosition.x >= 0 && mousePosition.x <= _view.screenWidth &&
+                  mousePosition.y >= 0 && mousePosition.y <= _view.screenHeight) {
+                const Cell& mouseCell = _view.PosnToCell(mousePosition.x, mousePosition.y);
+                _gameBoard.ApplyPattern(*_activePattern, mouseCell);
+              }
+            }
           }
           break;
         case sf::Event::MouseButtonReleased:
           if (event.mouseButton.button == sf::Mouse::Right && !_running) {
             try {
-              _gameBoard.ChangeCell(_view.PosnToCell(event.mouseButton.x,
-                                                   event.mouseButton.y));
+              if (_activePattern == NULL) {
+                _gameBoard.ChangeCell(_view.PosnToCell(event.mouseButton.x,
+                                                     event.mouseButton.y));
+              } else {
+                _gameBoard.CommitPattern();
+                _activePattern = NULL;
+              }
             } catch (const out_of_range& err) {
               cerr << "Out of range error when trying to modify cell" << endl;
             }
